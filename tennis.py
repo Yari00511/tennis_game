@@ -1,5 +1,4 @@
 import pygame
-import math
 import time
 
 
@@ -28,36 +27,51 @@ class Ball(pygame.sprite.Sprite):
         self.increment_x = increment_x
         self.increment_y = increment_y
         self.sound = sound
+        self.speed = speed
+    
+    def reverse_increment_x(self):
+
+        '''Reversing x increment.'''
+
+        self.increment_x *= -1
 
     def move(self, increment_x, increment_y):
 
         '''Moving the ball.'''
 
         self.rect.move_ip(-1*self.increment_x*self.speed, 0)
-        self.rect.move_ip(0, 1*self.increment_y*(speed//3))
+        self.rect.move_ip(0, 1*self.increment_y*(self.speed//3))
 
-    def collision_left(self, object):
+    def collision_left(self, smth):
 
         '''Ball hitting racket of Player 1.'''
 
-        if (self.rect.left  <= object.rect.right) and (self.rect.top < object.rect.bottom) and (self.rect.bottom > object.rect.top):
+        if (self.rect.left  <= smth.rect.right) and (self.rect.top < smth.rect.bottom) and (self.rect.bottom > smth.rect.top):
             return True
 
-    def collision_right(self, object):
+    def collision_right(self, smth):
 
         '''Ball hitting racket of Palyer 2.'''
 
-        if (self.rect.right  >= object.rect.left) and (self.rect.top < object.rect.bottom) and (self.rect.bottom > object.rect.top):
+        if (self.rect.right  >= smth.rect.left) and (self.rect.top < smth.rect.bottom) and (self.rect.bottom > smth.rect.top):
             return True
 
-    def change_angle(self, object):
-        
+    def change_angle(self, smth):
+
         '''Change the ball's angle depending on how far from the center it hits the racket.'''
 
-        a = self.rect.center[1]  - object.rect.top
-        b = object.rect.bottom - self.rect.center[1]
-        angle = (object.rect.center[1]-object.rect.top)/(9000)*(b-a)
-        return angle
+        a = self.rect.center[1]  - smth.rect.top
+        b = smth.rect.bottom - self.rect.center[1]
+        angle = (smth.rect.center[1]-smth.rect.top)/(9000)*(b-a)
+        self.increment_y = angle
+    
+    def hit_reaction(self, smth):
+
+        '''Reaction of the ball for hitting the racket: hitting sound, reversing x increment and changing y increment depending on the hit.'''
+
+        self.hit_sound()
+        self.reverse_increment_x()
+        self.change_angle(smth)
 
     def out_left(self, field):
 
@@ -130,6 +144,10 @@ class Score(pygame.sprite.Sprite):
         self.myfont = pygame.font.SysFont('Liberation Sans', 30)
         self.points1 = points1
         self.points2 = points2
+
+        self.plus_point_msg = 'One point for Player {}.'
+        self.won_msg = 'Congratualtions, Player {}! You won the game.'
+        self.congrats_song = 'tina_turner_the_best_cut.wav'
         
     def refresh(self, screen):
 
@@ -138,101 +156,128 @@ class Score(pygame.sprite.Sprite):
         self.textsurface = self.myfont.render('Player 1 points: {}     Player 2 points: {}'.format(self.points1, self.points2), False, (255, 255, 255))
         screen.blit(self.textsurface, (20, 20))
 
+    def plus_point1(self):
 
-def display_message(msg, screen, background, score, player_numb, waiting, dist):
+        '''Adding point to player 1.'''
 
-    '''Displaying the add points and victory messages.'''
+        self.points1 += 1
+
+    def plus_point2(self):
+
+        '''Adding point to player 2.'''
+
+        self.points2 += 1
+
+    def play_congrats_song(self):
+
+        '''Playing a congratulations song.'''
+
+        pygame.mixer.music.load(self.congrats_song)
+        pygame.mixer.music.play(0)
+
+
+    def display_message(self, msg, screen, background, player_numb, waiting, dist):
+
+        '''Displaying the add points and victory messages.'''
     
-    msg_font = pygame.font.SysFont('Liberation Sans', 30)
-    msg_textsurface = msg_font.render(msg.format(player_numb), False, (255, 255, 255))
+        msg_textsurface = self.myfont.render(msg.format(player_numb), False, (255, 255, 255))
     
-    screen.blit(msg_textsurface, (background.rect.center[0]-dist, 50))
-    score.refresh(screen)
-    pygame.display.update()
-    time.sleep(waiting)
+        screen.blit(msg_textsurface, (background.rect.center[0]-dist, 50))
+        self.refresh(screen)
+        pygame.display.update()
+        time.sleep(waiting)
 
-def reset_positions(ball, player1, player2):
+
+class Game(object):
+
+    '''Game class.'''
+
+    def __init__(self):
+
+        self.speed = 10
+        self.background = Background('court.png', [0, 0])
+        self.screen = pygame.display.set_mode(self.background.rect.size)
+        self.ball = Ball('ball.png', self.background.rect.center, self.speed, 1, 0, 'ball_hit.wav')
+        self.player1 = Player('racket1.png', [297, self.background.rect.center[1]], self.speed, pygame.K_w, pygame.K_s)
+        self.player2 = Player('racket2.png', [1497, self.background.rect.center[1]], self.speed, pygame.K_UP, pygame.K_DOWN)
+        self.score = Score()
+        self.running = True
+
+    def display_objects(self):
+
+        '''Displaying all objects on the screen.'''
+
+        self.screen.blit(self.background.image, self.background.rect)
+        self.screen.blit(self.ball.image, self.ball.rect)
+        self.screen.blit(self.player1.image, self.player1.rect)
+        self.screen.blit(self.player2.image, self.player2.rect)
+
+    def reset_positions(self):
 
         '''Reset the positions of the rackets and the ball.'''
 
-        ball.reset_pos(background.rect.center)
-        player1.reset_pos(297, background.rect.center[1])
-        player2.reset_pos(1497, background.rect.center[1])
+        self.ball.reset_pos(self.background.rect.center)
+        self.player1.reset_pos(297, self.background.rect.center[1])
+        self.player2.reset_pos(1497, self.background.rect.center[1])
 
-def congrats_song(song):
+    def add_points(self, player_numb):
 
-    '''Playing a congratulations song.'''
+        '''Adding one point to player 1 or 2 and ending the game if they have won.'''
 
-    pygame.mixer.music.load(song)
-    pygame.mixer.music.play(0)
-
-def display_objects(screen, background, ball, player1, player2):
-
-    '''Displaying all objects on the screen.'''
-
-    screen.blit(background.image, background.rect)
-    screen.blit(ball.image, ball.rect)
-    screen.blit(player1.image, player1.rect)
-    screen.blit(player2.image, player2.rect)
-
-
-speed = 10
-background = Background('court.png', [0, 0])
-ball = Ball('ball.png', background.rect.center, speed, 1, 0, 'ball_hit.wav')
-player1 = Player('racket1.png', [297, background.rect.center[1]], speed, pygame.K_w, pygame.K_s)
-player2 = Player('racket2.png', [1497, background.rect.center[1]], speed, pygame.K_UP, pygame.K_DOWN)
-score = Score()
-
-plus_point_msg = 'One point for Player {}.'
-won_msg = 'Congratualtions, Player {}! You won the game.'
-
-screen = pygame.display.set_mode(background.rect.size)
-pygame.display.set_caption('Tennis Game')
-
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-
-    display_objects(screen, background, ball, player1, player2)
-    
-    player1.handle_keys()
-    player2.handle_keys()
-    
-    if ball.collision_left(player1):
-        ball.hit_sound()
-        ball.increment_x *= -1
-        ball.increment_y = ball.change_angle(player1)
-    
-    if ball.collision_right(player2):
-        ball.hit_sound()
-        ball.increment_x *= -1
-        ball.increment_y = ball.change_angle(player2)
-    
-    ball.move(ball.increment_x, ball.increment_y)
-
-    if ball.out_left(background):
-        score.points1 += 1
-        reset_positions(ball, player1, player2)
-
-        if score.points1 == 6:
-            congrats_song('tina_turner_the_best_cut.wav')
-            display_message(won_msg, screen, background, score, 1, 20, 300)
-            running = False
+        if player_numb == 1:
+            self.score.plus_point1()
         else:
-            display_message(plus_point_msg, screen, background, score, 1, 4, 150)
+            self.score.plus_point2()
 
-    if ball.out_right(background):
-        score.points2 += 1
-        reset_positions(ball, player1, player2)
-
-        if score.points2 == 6:
-            congrats_song('tina_turner_the_best_cut.wav')
-            display_message(won_msg, screen, background, score, 2, 20, 300)
-            running = False
+        if ((self.score.points1 == 6) or (self.score.points2 == 6)):
+            self.score.play_congrats_song()
+            self.score.display_message(self.score.won_msg, self.screen, self.background, player_numb, 20, 300)
+            self.end_game()
         else:
-            display_message(plus_point_msg, screen, background, score, 2, 4, 150)
+            self.score.display_message(self.score.plus_point_msg, self.screen, self.background, player_numb, 4, 150)
 
-    score.refresh(screen)
-    pygame.display.update()
+    def end_game():
+
+        '''Ending the game.'''
+
+        self.running = False
+
+    
+    def play_game(self):
+
+        '''Playing process.'''
+        
+        pygame.display.set_caption('Tennis Game')
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+
+        self.display_objects()
+
+        self.player1.handle_keys()
+        self.player2.handle_keys()
+
+        if self.ball.collision_left(self.player1):
+            self.ball.hit_reaction(self.player1)
+
+        if self.ball.collision_right(self.player2):
+            self.ball.hit_reaction(self.player2)
+
+        self.ball.move(self.ball.increment_x, self.ball.increment_y)
+
+        if self.ball.out_left(self.background):
+            self.add_points(1)
+            self.reset_positions()
+
+        if self.ball.out_right(self.background):
+            self.add_points(2)
+            self.reset_positions()
+
+        self.score.refresh(self.screen)
+        pygame.display.update()
+
+
+tennis_game = Game()
+while tennis_game.running:
+    tennis_game.play_game()
